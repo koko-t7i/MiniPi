@@ -1,0 +1,14 @@
+{
+  "statusFilter": {
+    "mode": "all",
+    "hidden": []
+  },
+  "segments": [
+    "model",
+    "cwd",
+    "branch",
+    "context",
+    "progress",
+    "extensions"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "packages": [
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:@narumitw/pi-plan-mode",
+    {
+      "source": "https://github.com/XYenon/catppuccin-pi-coding-agent",
+      "themes": [
+        "themes/catppuccin-frappe-green.json"
+      ]
+    },
+    "npm:pi-rtk-optimizer",
+    "npm:@ff-labs/pi-fff",
+    "npm:pi-smart-fetch",
+    "npm:@gotgenes/pi-subagents",
+    "npm:pi-caveman",
+    "git:github.com/koko-t7i/MiniPi"
+  ]
+}
