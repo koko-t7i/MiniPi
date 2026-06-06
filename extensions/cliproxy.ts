@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 
-const PROVIDER_ID = "cliproxy-codex";
-const DEFAULT_BASE_URL = "http://localhost:8317/v1";
-const DEFAULT_API_KEY = "$CLIPROXY_API_KEY";
+const PROVIDER_ID = "cliproxy";
+const DEFAULT_BASE_URL = "https://redacted.example/v1";
+const DEFAULT_API_KEY = "!cat /redacted/token";
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 const THINKING_LEVEL_MAP = { minimal: "low", xhigh: "xhigh" };
 
@@ -54,11 +54,11 @@ function normalizeBaseUrl(value: string | undefined): string {
 	return baseUrl.replace(/\/+$/, "");
 }
 
-export default function registerCLIProxyCodex(pi: ExtensionAPI): void {
+export default function registerCLIProxy(pi: ExtensionAPI): void {
 	pi.registerProvider(PROVIDER_ID, {
-		name: "CLIProxy Codex",
+		name: "CLIProxy",
 		baseUrl: normalizeBaseUrl(process.env.CLIPROXY_BASE_URL),
-		apiKey: DEFAULT_API_KEY,
+		apiKey: process.env.CLIPROXY_API_KEY?.trim() || DEFAULT_API_KEY,
 		api: "openai-responses",
 		models: CODEX_MODELS,
 	});

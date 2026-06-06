@@ -14,34 +14,30 @@ If pi is already running, reload resources:
 /reload
 ```
 
-## CLIProxy Codex provider
+## CLIProxy provider
 
-MiniPi registers a Pi provider named `cliproxy-codex` for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). It uses the OpenAI Responses-compatible endpoint at `http://localhost:8317/v1` by default and exposes Codex models through CLIProxyAPI.
+MiniPi registers a Pi provider named `cliproxy` for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). It uses the OpenAI Responses-compatible endpoint at `https://redacted.example/v1` by default and exposes Codex models through CLIProxyAPI.
 
-1. Start CLIProxyAPI and configure an `api-keys` value in its config.
-2. Export the same key for Pi:
+By default the provider reads its API key by running `cat /redacted/token` at request time (Pi's `!command` API-key form). No extra setup is needed if that token file exists.
 
-```bash
-export CLIPROXY_API_KEY="your-cli-proxy-api-key"
-```
-
-3. Select a model in Pi, for example:
+1. Select a model in Pi, for example:
 
 ```text
-/model cliproxy-codex/gpt-5.4-mini
+/model cliproxy/gpt-5.4-mini
 ```
 
 Available static model entries:
 
-- `cliproxy-codex/gpt-5.3-codex-spark`
-- `cliproxy-codex/gpt-5.4`
-- `cliproxy-codex/gpt-5.4-mini`
-- `cliproxy-codex/gpt-5.5`
+- `cliproxy/gpt-5.3-codex-spark`
+- `cliproxy/gpt-5.4`
+- `cliproxy/gpt-5.4-mini`
+- `cliproxy/gpt-5.5`
 
-Use `CLIPROXY_BASE_URL` to override the default endpoint:
+To override the defaults, set either environment variable:
 
 ```bash
-export CLIPROXY_BASE_URL="http://localhost:8317/v1"
+export CLIPROXY_API_KEY="your-cli-proxy-api-key"   # overrides the token-file lookup
+export CLIPROXY_BASE_URL="http://localhost:8317/v1" # overrides the default endpoint
 ```
 
 ## One-key agent config
@@ -74,4 +70,4 @@ MiniPi does **not** include or manage:
 - private SSH keys
 - local `.env` files
 
-MiniPi only references `CLIPROXY_API_KEY`; it does not store or generate CLIProxyAPI credentials.
+MiniPi reads the CLIProxyAPI token from `/redacted/token` (or `CLIPROXY_API_KEY` if set) at request time; it does not store or generate CLIProxyAPI credentials.
