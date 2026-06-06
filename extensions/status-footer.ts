@@ -23,10 +23,11 @@ import {
 	Container,
 	type SettingItem,
 	SettingsList,
+	Text,
 	truncateToWidth,
 } from "@earendil-works/pi-tui";
 
-type SegmentName = "model" | "cwd" | "branch" | "context" | "progress" | "extensions";
+type SegmentName = "model" | "cwd" | "branch" | "context" | "in" | "out" | "progress" | "extensions";
 type StatusFilter =
 	| { mode: "all"; hidden: Set<string> }
 	| { mode: "only"; shown: Set<string> };
@@ -95,6 +96,7 @@ const NORMAL_CHECKPOINT_MAX_WAIT_MS = 2_500;
 const MAX_SAFE_PROGRESS_CHARS = 240;
 const CONFIG_PATH =
 	process.env.PI_BAR_CONFIG ?? join(homedir(), ".pi", "agent", "pi-bar.json");
+const TURN_TIMING_CUSTOM_TYPE = "miniPi.turnDuration";
 
 const DEFAULT_SEGMENTS: SegmentName[] = [
 	"model",
@@ -109,6 +111,8 @@ const ALL_SEGMENTS: readonly SegmentName[] = [
 	"cwd",
 	"branch",
 	"context",
+	"in",
+	"out",
 	"progress",
 	"extensions",
 ];
@@ -117,6 +121,8 @@ const SEGMENT_LABELS: Record<SegmentName, string> = {
 	cwd: "Working directory",
 	branch: "Git branch",
 	context: "Context usage",
+	in: "Input tokens",
+	out: "Output tokens",
 	progress: "Progress update",
 	extensions: "Extension statuses",
 };
@@ -136,6 +142,22 @@ function formatTokens(n: number): string {
 		return value >= 10 ? `${Math.round(value)}k` : `${value.toFixed(1)}k`;
 	}
 	return `${n}`;
+}
+
+function formatDuration(ms: number): string {
+	if (!Number.isFinite(ms) || ms < 0) ms = 0;
+	const totalSeconds = Math.round(ms / 1000);
+	if (totalSeconds < 1) return "less than a second";
+	const h = Math.floor(totalSeconds / 3600);
+	const m = Math.floor((totalSeconds % 3600) / 60);
+	const s = totalSeconds % 60;
+	if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+	if (m > 0) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+	return `${s}s`;
+}
+
+function formatBaked(ms: number): string {
+	return `Baked for ${formatDuration(ms)}`;
 }
 
 function formatCwdForStatusBar(cwd: string): string {
@@ -1597,8 +1619,11 @@ function getKnownStatusKeys(filter: StatusFilter, seenStatusKeys: Set<string>): 
 
 export default function (pi: ExtensionAPI) {
 	let requestRender: (() => void) | undefined;
+	let turnStartedAt: number | undefined;
 	let statusFilter: StatusFilter = { mode: "all", hidden: new Set() };
 	let visibleSegments: SegmentName[] = readGlobalSegments() ?? DEFAULT_SEGMENTS;
+	let sessionInputTokens = 0;
+	let sessionOutputTokens = 0;
 	const seenStatusKeys = new Set<string>();
 	const refresh = () => requestRender?.();
 	const progress = new FooterProgressEngine(refresh);
@@ -1755,11 +1780,43 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerMessageRenderer<undefined>(
+		TURN_TIMING_CUSTOM_TYPE,
+		(message, _options, theme) => {
+			const text = typeof message.content === "string" ? message.content : "";
+			if (!text) return undefined;
+			return new Text(theme.fg("dim", text));
+		},
+	);
+
 	pi.on("model_select", async () => refresh());
 	pi.on("thinking_level_select", async () => refresh());
 	pi.on("turn_end", async () => refresh());
 	pi.on("before_agent_start", async (event, ctx) => {
+		turnStartedAt = performance.now();
 		if (visibleSegments.includes("progress")) progress.recordUserMessage(ctx, event.prompt);
+	});
+	pi.on("agent_end", async (event, ctx) => {
+		const startedAt = turnStartedAt;
+		turnStartedAt = undefined;
+		if (startedAt === undefined || !ctx.hasUI) return;
+		// Skip aborted runs (no meaningful "bake" time to report).
+		const last = event.messages[event.messages.length - 1];
+		if (last && (last as { stopReason?: string }).stopReason === "aborted") return;
+		const elapsed = performance.now() - startedAt;
+		// Defer past finishRun() so isStreaming is false and the message lands in
+		// the display-only branch instead of steering the model (no extra turn).
+		setTimeout(() => {
+			if (!ctx.isIdle()) return; // a new request already started
+			pi.sendMessage(
+				{
+					customType: TURN_TIMING_CUSTOM_TYPE,
+					content: formatBaked(elapsed),
+					display: true,
+				},
+				{ triggerTurn: false },
+			);
+		}, 0);
 	});
 	pi.on("message_update", async (event, ctx) => {
 		if (visibleSegments.includes("progress")) progress.recordAssistantUpdate(ctx, event.message);
@@ -1771,6 +1828,12 @@ export default function (pi: ExtensionAPI) {
 		if (visibleSegments.includes("progress")) progress.recordToolResult(ctx, event);
 	});
 	pi.on("message_end", async (event, ctx) => {
+		const message = event.message;
+		if (message.role === "custom") return; // ignore our own injected timing line
+		if (message.role === "assistant" && message.usage) {
+			if (Number.isFinite(message.usage.input)) sessionInputTokens += message.usage.input;
+			if (Number.isFinite(message.usage.output)) sessionOutputTokens += message.usage.output;
+		}
 		if (visibleSegments.includes("progress")) progress.recordMessageEnd(ctx, event.message);
 		refresh();
 	});
@@ -1778,6 +1841,8 @@ export default function (pi: ExtensionAPI) {
 		progress.shutdown();
 	});
 	pi.on("session_tree", async (_event, ctx) => {
+		sessionInputTokens = 0;
+		sessionOutputTokens = 0;
 		if (visibleSegments.includes("progress")) progress.startSession(ctx.cwd);
 		else progress.shutdown();
 		restoreStatusFilter();
@@ -1785,6 +1850,8 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		sessionInputTokens = 0;
+		sessionOutputTokens = 0;
 		visibleSegments = readGlobalSegments() ?? DEFAULT_SEGMENTS;
 		if (visibleSegments.includes("progress")) progress.startSession(ctx.cwd);
 		else progress.shutdown();
@@ -1835,6 +1902,8 @@ export default function (pi: ExtensionAPI) {
 						cwd: theme.fg("dim", cwdText),
 						branch: branchText ? theme.fg("muted", branchText) : null,
 						context: theme.fg(contextSegmentColor, contextText),
+						in: theme.fg("muted", `in ${formatTokens(sessionInputTokens)}`),
+						out: theme.fg("muted", `out ${formatTokens(sessionOutputTokens)}`),
 						progress: progressText ? theme.fg("text", progressText) : null,
 						extensions: extensionStatuses,
 					};
