@@ -1,20 +1,11 @@
 /**
- * pi-bar — footer / statusline extension.
+ * MiniPi status bar extension.
  *
- * Replaces pi's built-in footer with left-aligned segments:
- *   <model> ❯ think:<level> ❯ <context% / window> ❯ <progress> ❯ <extensions>
+ * Replaces pi's built-in footer with a compact one-line status:
+ *   <model> <thinking> · <cwd> · <branch> · <context% / window> · <progress> · <statuses>
  *
  * Example:
- *   claude-opus-4.7  ❯  think:med  ❯  2.6% / 1.0M  ❯  Reviewing package structure
- *
- * Re-renders on model change, thinking-level change, status updates, and after
- * each assistant turn so context usage stays current.
- *
- * Environment variables:
- *   PI_BAR_SHOW           comma-separated list of segments to show
- *   PI_BAR_THRESHOLDS     warning,danger context-usage percentages
- *   PI_BAR_PROGRESS_MODEL provider/id for the progress update model
- *   PI_BAR_CONFIG         override the persisted pi-bar config path
+ *   gpt-5.5 xhigh · ~/rpc-gateway · test · 4.1% / 272k · Updating config
  */
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -35,7 +26,7 @@ import {
 	truncateToWidth,
 } from "@earendil-works/pi-tui";
 
-type SegmentName = "model" | "thinking" | "cwd" | "branch" | "context" | "progress" | "extensions";
+type SegmentName = "model" | "cwd" | "branch" | "context" | "progress" | "extensions";
 type StatusFilter =
 	| { mode: "all"; hidden: Set<string> }
 	| { mode: "only"; shown: Set<string> };
@@ -78,13 +69,11 @@ type FastModelAuth = {
 	headers?: Record<string, string>;
 };
 
-const STATUS_FILTER_ENTRY_TYPE = "pi-bar-status-filter";
 const SETTINGS_PROGRESS_KEY = "progress";
 const SETTINGS_BAR_KEY = "bar";
 const MAX_ACTIVITY_TEXT_CHARS = 800;
 const MAX_USER_TEXT_CHARS = 700;
 const MAX_ASSISTANT_UPDATE_CHARS = 500;
-const MAX_TOOL_RESULT_OK_CHARS = 160;
 const MAX_TOOL_RESULT_ERROR_CHARS = 320;
 const MAX_FINAL_TEXT_CHARS = 700;
 const MAX_RETAINED_RAW_ACTIVITIES = 128;
@@ -117,7 +106,6 @@ const DEFAULT_SEGMENTS: SegmentName[] = [
 ];
 const ALL_SEGMENTS: readonly SegmentName[] = [
 	"model",
-	"thinking",
 	"cwd",
 	"branch",
 	"context",
@@ -126,7 +114,6 @@ const ALL_SEGMENTS: readonly SegmentName[] = [
 ];
 const SEGMENT_LABELS: Record<SegmentName, string> = {
 	model: "Model + thinking",
-	thinking: "Thinking level (separate)",
 	cwd: "Working directory",
 	branch: "Git branch",
 	context: "Context usage",
@@ -174,28 +161,6 @@ function formatModelName(id: string | undefined): string {
 	return base.replace(/-\d{8}$/, "").replace(/-\d{4}-\d{2}-\d{2}$/, "");
 }
 
-function thinkingColor(level: string): ThemeColor {
-	switch (level) {
-		case "off":
-			return "thinkingOff";
-		case "minimal":
-		case "min":
-			return "thinkingMinimal";
-		case "low":
-			return "thinkingLow";
-		case "medium":
-		case "med":
-			return "thinkingMedium";
-		case "high":
-			return "thinkingHigh";
-		case "xhigh":
-		case "extra-high":
-			return "thinkingXhigh";
-		default:
-			return "thinkingText";
-	}
-}
-
 function contextColor(
 	percent: number | null | undefined,
 	warningThreshold: number,
@@ -209,18 +174,6 @@ function contextColor(
 
 function isSegmentName(value: string): value is SegmentName {
 	return (ALL_SEGMENTS as readonly string[]).includes(value);
-}
-
-function parseSegments(): SegmentName[] {
-	const raw = process.env.PI_BAR_SHOW;
-	if (!raw) return DEFAULT_SEGMENTS;
-
-	const requested = raw
-		.split(",")
-		.map((segment) => segment.trim().toLowerCase())
-		.filter(isSegmentName);
-
-	return requested.length > 0 ? requested : DEFAULT_SEGMENTS;
 }
 
 function parseThresholds(): { warningThreshold: number; errorThreshold: number } {
@@ -1209,7 +1162,7 @@ ${goodExamples}
 Bad examples:
 - Editing extensions/status-footer.ts with success.
 - Reading status-footer file completed successfully.
-- Publishing \`pi-bar@0.3.3\` to npm.
+- Publishing \`package@0.3.3\` to npm.
 - Grepping for sanitizeProgressText callers.
 - Verifying repository status after commit.
 - Investigating user input responses.
@@ -1388,7 +1341,7 @@ function stripMarkdownFormatting(text: string): string {
 }
 
 // File-path / version / package leaks observed in backtests:
-//   extensions/status-footer.ts, README.md, package.json, pi-bar@0.3.3, …
+//   extensions/status-footer.ts, README.md, package.json, package@0.3.3, …
 const FILE_PATH_PATTERN =
 	/(?:\b[\w./@-]+\.(?:ts|tsx|js|jsx|mjs|cjs|md|json|yml|yaml|toml|lock|sh|py|rs|go|html|css))\b/g;
 const PACKAGE_VERSION_PATTERN = /\b[\w./@-]+@\d[\w.+-]*\b/g;
@@ -1611,7 +1564,7 @@ function readGlobalStatusFilter(): StatusFilter | null {
 }
 
 function readGlobalSegments(): SegmentName[] | null {
-	return process.env.PI_BAR_SHOW ? parseSegments() : readGlobalConfig().segments ?? null;
+	return readGlobalConfig().segments ?? null;
 }
 
 function writeGlobalConfig(config: GlobalBarConfig): void {
@@ -1649,16 +1602,8 @@ export default function (pi: ExtensionAPI) {
 	const seenStatusKeys = new Set<string>();
 	const refresh = () => requestRender?.();
 	const progress = new FooterProgressEngine(refresh);
-	const restoreStatusFilter = (ctx: ExtensionContext) => {
-		let restoredFilter = readGlobalStatusFilter();
-		if (!restoredFilter) {
-			for (const entry of ctx.sessionManager.getBranch()) {
-				if (entry.type === "custom" && entry.customType === STATUS_FILTER_ENTRY_TYPE) {
-					restoredFilter = parseSerializedStatusFilter(entry.data);
-				}
-			}
-		}
-		statusFilter = restoredFilter ?? { mode: "all", hidden: new Set() };
+	const restoreStatusFilter = () => {
+		statusFilter = readGlobalStatusFilter() ?? { mode: "all", hidden: new Set() };
 	};
 	const persistStatusFilter = () => {
 		writeGlobalStatusFilter(statusFilter);
@@ -1745,7 +1690,7 @@ export default function (pi: ExtensionAPI) {
 				new (class {
 					render(_width: number) {
 						return [
-							theme.fg("accent", theme.bold("pi-bar visibility")),
+							theme.fg("accent", theme.bold("MiniPi status bar")),
 							theme.fg(
 								"dim",
 								knownStatusKeys.length > 0
@@ -1804,7 +1749,7 @@ export default function (pi: ExtensionAPI) {
 		});
 	};
 	pi.registerCommand("bar", {
-		description: "Configure pi-bar footer visibility",
+		description: "Configure MiniPi status bar",
 		handler: async (_args, ctx) => {
 			await openSegmentConfigurator(ctx);
 		},
@@ -1835,7 +1780,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_tree", async (_event, ctx) => {
 		if (visibleSegments.includes("progress")) progress.startSession(ctx.cwd);
 		else progress.shutdown();
-		restoreStatusFilter(ctx);
+		restoreStatusFilter();
 		refresh();
 	});
 
@@ -1843,7 +1788,7 @@ export default function (pi: ExtensionAPI) {
 		visibleSegments = readGlobalSegments() ?? DEFAULT_SEGMENTS;
 		if (visibleSegments.includes("progress")) progress.startSession(ctx.cwd);
 		else progress.shutdown();
-		restoreStatusFilter(ctx);
+		restoreStatusFilter();
 
 		if (!ctx.hasUI) return;
 
@@ -1860,10 +1805,7 @@ export default function (pi: ExtensionAPI) {
 				render(width: number): string[] {
 					const modelName = formatModelName(ctx.model?.id);
 					const thinkingLevel = String(pi.getThinkingLevel());
-					const showStandaloneThinking = visibleSegments.includes("thinking");
-					const modelText = showStandaloneThinking
-						? modelName
-						: `${modelName} ${thinkingLevel}`;
+					const modelText = `${modelName} ${thinkingLevel}`;
 					const cwdText = formatCwdForStatusBar(ctx.sessionManager.getCwd());
 					const branchText = footerData?.getGitBranch?.();
 					const extensionStatusParts = formatExtensionStatuses(
@@ -1890,9 +1832,6 @@ export default function (pi: ExtensionAPI) {
 						: null;
 					const segmentRenderers: Record<SegmentName, string | null> = {
 						model: theme.fg("accent", modelText),
-						thinking: showStandaloneThinking
-							? theme.fg(thinkingColor(thinkingLevel), thinkingLevel)
-							: null,
 						cwd: theme.fg("dim", cwdText),
 						branch: branchText ? theme.fg("muted", branchText) : null,
 						context: theme.fg(contextSegmentColor, contextText),
