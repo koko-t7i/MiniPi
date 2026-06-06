@@ -1,14 +1,17 @@
 {
   "name": "minipi",
-  "version": "2.0.0",
-  "description": "Personal pi package with a compact status bar and agent bootstrap config.",
+  "version": "2.1.0",
+  "description": "Personal pi package with a compact status bar, CLIProxy Codex provider, and agent bootstrap config.",
   "type": "module",
   "keywords": [
     "pi-package",
     "pi-extension",
     "pi",
     "footer",
-    "statusline"
+    "statusline",
+    "cliproxy",
+    "codex",
+    "provider"
   ],
   "license": "MIT",
   "repository": {
@@ -17,7 +20,8 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/status-footer.ts"
+      "./extensions/status-footer.ts",
+      "./extensions/cliproxy-codex.ts"
     ]
   },
   "peerDependencies": {
