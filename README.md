@@ -68,14 +68,7 @@ Inside pi:
 /bar
 ```
 
-Useful commands:
-
-```text
-/bar segments list
-/bar segments only model cwd branch context progress extensions
-/bar segments hide progress
-/bar status
-```
+`/bar` opens the visual configurator for footer segments and extension statuses. No extra subcommands are needed.
 
 Choices persist in:
 
