@@ -13,6 +13,10 @@ sessions/
 .env
 .env.*
 
+# localflow local passphrase (never commit)
+.claude/passphrase
+.codex/passphrase
+
 # Logs and local editor files
 *.log
 .DS_Store
