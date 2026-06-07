@@ -17,7 +17,9 @@ If pi is already running, reload resources:
 ## Extensions
 
 - **status-footer** — compact one-line status bar (model · cwd · branch · context · progress). Run `/bar` to configure segments.
-- **cliproxy** — registers a `cliproxy` provider for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (e.g. `cliproxy/gpt-5.5`). Reads its token from `/redacted/token` and mirrors the Codex CLI request headers. Override defaults with `CLIPROXY_API_KEY`, `CLIPROXY_BASE_URL`, `CLIPROXY_USER_AGENT`, or `CLIPROXY_ORIGINATOR`.
+
+Custom providers (private endpoints, self-hosted gateways, etc.) belong in your local
+`~/.pi/agent/models.json`, not in this public package — see pi's models.json format.
 
 ## One-key agent config
 
@@ -48,5 +50,3 @@ MiniPi does **not** include or manage:
 - session history
 - private SSH keys
 - local `.env` files
-
-MiniPi reads the CLIProxyAPI token from `/redacted/token` (or `CLIPROXY_API_KEY` if set) at request time; it does not store or generate CLIProxyAPI credentials.
