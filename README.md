@@ -14,38 +14,10 @@ If pi is already running, reload resources:
 /reload
 ```
 
-## CLIProxy provider
+## Extensions
 
-MiniPi registers a Pi provider named `cliproxy` for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). It uses the OpenAI Responses-compatible endpoint at `https://redacted.example/v1` by default and exposes Codex models through CLIProxyAPI.
-
-By default the provider reads its API key by running `cat /redacted/token` at request time (Pi's `!command` API-key form). No extra setup is needed if that token file exists.
-
-1. Select a model in Pi, for example:
-
-```text
-/model cliproxy/gpt-5.4-mini
-```
-
-Available static model entries:
-
-- `cliproxy/gpt-5.3-codex-spark`
-- `cliproxy/gpt-5.4`
-- `cliproxy/gpt-5.4-mini`
-- `cliproxy/gpt-5.5`
-
-To override the defaults, set either environment variable:
-
-```bash
-export CLIPROXY_API_KEY="your-cli-proxy-api-key"    # overrides the token-file lookup
-export CLIPROXY_BASE_URL="http://localhost:8317/v1" # overrides the default endpoint
-export CLIPROXY_USER_AGENT="codex_cli_rs/0.137.0 (...)" # overrides the request User-Agent
-export CLIPROXY_ORIGINATOR="codex_cli_rs"               # overrides the originator header
-```
-
-The provider mirrors the real Codex CLI's `User-Agent` and `originator` headers because
-the gateway's WAF rejects the OpenAI SDK's default `OpenAI/JS …` agent with
-`403 Your request was blocked.` The default UA is captured from the installed `codex`
-binary on this host; override the two env vars on other hosts/versions.
+- **status-footer** — compact one-line status bar (model · cwd · branch · context · progress). Run `/bar` to configure segments.
+- **cliproxy** — registers a `cliproxy` provider for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (e.g. `cliproxy/gpt-5.5`). Reads its token from `/redacted/token` and mirrors the Codex CLI request headers. Override defaults with `CLIPROXY_API_KEY`, `CLIPROXY_BASE_URL`, `CLIPROXY_USER_AGENT`, or `CLIPROXY_ORIGINATOR`.
 
 ## One-key agent config
 
