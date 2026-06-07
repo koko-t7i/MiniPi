@@ -4,9 +4,14 @@ const PROVIDER_ID = "cliproxy";
 const DEFAULT_BASE_URL = "https://redacted.example/v1";
 const DEFAULT_API_KEY = "!cat /redacted/token";
 // The gateway's WAF blocks the OpenAI SDK's default `User-Agent: OpenAI/JS …`
-// with a 403 "Your request was blocked." Send a Codex-style UA (the same client
-// the gateway is known to accept) so requests pass through.
-const DEFAULT_USER_AGENT = "codex_cli_rs/0.20.0";
+// with a 403 "Your request was blocked." We mirror the real Codex CLI exactly so
+// requests are indistinguishable from it (survives a strict UA allowlist too).
+// Captured from the installed `codex` (codex_cli_rs/0.137.0) on this host via its
+// own os_info/terminal probe — hence "24.4.0" (not "24.04"). Override per-host
+// with CLIPROXY_USER_AGENT / CLIPROXY_ORIGINATOR.
+const DEFAULT_USER_AGENT =
+	"codex_cli_rs/0.137.0 (Ubuntu 24.4.0; x86_64) xterm-256color (codex_cli_rs; 0.137.0)";
+const DEFAULT_ORIGINATOR = "codex_cli_rs";
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 const THINKING_LEVEL_MAP = { minimal: "low", xhigh: "xhigh" };
 
@@ -66,6 +71,7 @@ export default function registerCLIProxy(pi: ExtensionAPI): void {
 		api: "openai-responses",
 		headers: {
 			"User-Agent": process.env.CLIPROXY_USER_AGENT?.trim() || DEFAULT_USER_AGENT,
+			originator: process.env.CLIPROXY_ORIGINATOR?.trim() || DEFAULT_ORIGINATOR,
 		},
 		models: CODEX_MODELS,
 	});

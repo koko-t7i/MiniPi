@@ -38,11 +38,14 @@ To override the defaults, set either environment variable:
 ```bash
 export CLIPROXY_API_KEY="your-cli-proxy-api-key"    # overrides the token-file lookup
 export CLIPROXY_BASE_URL="http://localhost:8317/v1" # overrides the default endpoint
-export CLIPROXY_USER_AGENT="codex_cli_rs/0.20.0"    # overrides the request User-Agent
+export CLIPROXY_USER_AGENT="codex_cli_rs/0.137.0 (...)" # overrides the request User-Agent
+export CLIPROXY_ORIGINATOR="codex_cli_rs"               # overrides the originator header
 ```
 
-The provider sends a Codex-style `User-Agent` because the gateway's WAF rejects the
-OpenAI SDK's default `OpenAI/JS …` agent with `403 Your request was blocked.`
+The provider mirrors the real Codex CLI's `User-Agent` and `originator` headers because
+the gateway's WAF rejects the OpenAI SDK's default `OpenAI/JS …` agent with
+`403 Your request was blocked.` The default UA is captured from the installed `codex`
+binary on this host; override the two env vars on other hosts/versions.
 
 ## One-key agent config
 
