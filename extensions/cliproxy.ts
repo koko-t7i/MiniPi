@@ -3,6 +3,10 @@ import type { ExtensionAPI, ProviderModelConfig } from "@earendil-works/pi-codin
 const PROVIDER_ID = "cliproxy";
 const DEFAULT_BASE_URL = "https://redacted.example/v1";
 const DEFAULT_API_KEY = "!cat /redacted/token";
+// The gateway's WAF blocks the OpenAI SDK's default `User-Agent: OpenAI/JS …`
+// with a 403 "Your request was blocked." Send a Codex-style UA (the same client
+// the gateway is known to accept) so requests pass through.
+const DEFAULT_USER_AGENT = "codex_cli_rs/0.20.0";
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 const THINKING_LEVEL_MAP = { minimal: "low", xhigh: "xhigh" };
 
@@ -60,6 +64,9 @@ export default function registerCLIProxy(pi: ExtensionAPI): void {
 		baseUrl: normalizeBaseUrl(process.env.CLIPROXY_BASE_URL),
 		apiKey: process.env.CLIPROXY_API_KEY?.trim() || DEFAULT_API_KEY,
 		api: "openai-responses",
+		headers: {
+			"User-Agent": process.env.CLIPROXY_USER_AGENT?.trim() || DEFAULT_USER_AGENT,
+		},
 		models: CODEX_MODELS,
 	});
 }

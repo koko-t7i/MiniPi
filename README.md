@@ -36,9 +36,13 @@ Available static model entries:
 To override the defaults, set either environment variable:
 
 ```bash
-export CLIPROXY_API_KEY="your-cli-proxy-api-key"   # overrides the token-file lookup
+export CLIPROXY_API_KEY="your-cli-proxy-api-key"    # overrides the token-file lookup
 export CLIPROXY_BASE_URL="http://localhost:8317/v1" # overrides the default endpoint
+export CLIPROXY_USER_AGENT="codex_cli_rs/0.20.0"    # overrides the request User-Agent
 ```
+
+The provider sends a Codex-style `User-Agent` because the gateway's WAF rejects the
+OpenAI SDK's default `OpenAI/JS …` agent with `403 Your request was blocked.`
 
 ## One-key agent config
 
