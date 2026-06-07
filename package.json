@@ -1,6 +1,6 @@
 {
   "name": "minipi",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Personal pi package with a compact status bar, CLIProxy provider, and agent bootstrap config.",
   "type": "module",
   "keywords": [
